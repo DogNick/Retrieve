@@ -9,40 +9,65 @@ from candidate import candidate
 from candidate import search
 from seg import seg_without_punc
 
-def intervene(query, result):
+def is_chinese(uchar):
+    """判断一个unicode是否是汉字"""
+    if uchar >= u'\u4e00' and uchar <= u'\u9fa5' or uchar >= u'\uff00' and uchar <= u'\uffef' or uchar >= u'\u3000' and uchar <= u'\u303f':
+        return True
+    else:
+        return False
+ 
+def nick_format(text, width):
+    stext = str(text)
+    utext = stext.decode("utf-8")
+    cn_count = 0
+    for u in utext:
+        if is_chinese(u):
+    #        print u.encode("utf-8")
+            cn_count = cn_count + 1 
+    return stext + " " * (width - cn_count - len(utext))
+
+
+
+def query_resp_same(query, resp):
     final_result = []
     query_seg = ''.join(seg_without_punc(query.encode('gbk', 'ignore')))
-    for x in result:
-        x_seg = ''.join(seg_without_punc(x[1].decode('utf8').encode('gbk', 'ignore')))
-        if query_seg != x_seg:
-            final_result.append(list(x)+[1])
-        else:
-            final_result.append(list(x)+[0])
-    return final_result
+    resp_seg = ''.join(seg_without_punc(resp.decode('utf8').encode('gbk', 'ignore')))
+    return (query_seg == resp_seg) 
 
-import redis
-redis_pool = redis.ConnectionPool(host="10.134.109.225", port=6379)
-
-def get_flag(key):
-    r = redis.Redis(connection_pool=redis_pool)
-    value = r.get(key)
-    if value is None:
-        value = 0
-    return value
-
-import hashlib 
+#import redis
+#import hashlib 
+#redis_pool = redis.ConnectionPool(host="10.134.109.225", port=6379)
+#
+#def get_flag(key):
+#    r = redis.Redis(connection_pool=redis_pool)
+#    value = r.get(key)
+#    if value is None:
+#        value = 0
+#    return value
+#
+#        flag = get_flag("retrieve:"+hashlib.md5(query.encode('utf8') + each[0] + each[1]).hexdigest())
+#        if flag == 1:
+#            continue
+   
 import time
-
 @app.route('/retrieve', methods=['get'])
 def name():
     # return is formalized
-    has_ret = True
     ret = {}
     ret["result"] = None 
     ret["debug_info"] = {} 
 
+        
+
     # search candidates
     query = request.args.get('query')
+    #if not nick_is_valid_post(query, ret["debug_info"]): 
+    #    print ("post is not valid, return empty")
+    #    ret["result"] = [] 
+    #    resp = make_response(json.dumps(ret))
+    #    resp.headers['Access-Control-Allow-Origin'] = '*' 
+    #    return resp
+
     #magic = request.args.get('magic')
     magic = ""
     can_start = time.time()
@@ -55,16 +80,6 @@ def name():
         resp = make_response(json.dumps(ret))
         resp.headers['Access-Control-Allow-Origin'] = '*' 
         return resp
-     
-    # do scores for all candidats from rank_server
-    # swap response and post
-    cans_temp = []
-    for can in cans:
-        temp = list(can)
-        if can[2] == 'response':
-            temp[0] = can[1]
-            temp[1] = can[0]
-        cans_temp.append(tuple(temp))
 
     # Nick disable score_server 
     #payload = {'query':query, 'cans':cans_temp}
@@ -79,31 +94,30 @@ def name():
     #    return resp
     #
     #scores = json.loads(response.text)
-    scores = [[1] * 15] * len(cans_temp) #fake
+    scores = [[1] * 15] * len(cans) #fake
 
-    #xs = sorted(zip(scores, cans_temp, range(len(cans_temp))), key=lambda x:(x[0][-1], -x[2]), reverse=True)
-    
+    topN = 7 
+    cnt = 0
+    # result select
     f_s_start = time.time()
     result = []
-    for i, each in enumerate(cans_temp):
-        flag = get_flag("retrieve:"+hashlib.md5(query.encode('utf8') + each[0] + each[1]).hexdigest())
-        if flag == 1:
+    for i, each in enumerate(cans):
+        if query_resp_same(query, each[1]):
             continue
         each = list(each)
         each.append(scores[i])
-        each.append(flag)
         each.append(i)
         result.append(each)
-    result = intervene(query, result)
-    #result = nick_sort(result)
-    f_s_time = time.time() - f_s_start
-
-    print (">>> query: %s, can_time:%.5f, score_time:%.5f, filter_sort_time: %.5f" % (query.encode("utf-8"), can_time, score_time, f_s_time))
-    N = 7 
-    for i, each in enumerate(result):
-        if i == N:
+        print result[-1]
+        cnt = cnt + 1 
+        if cnt == topN:
             break
-        print(">>> retrieve(%d): %-60s%-60s%-s" % (i, each[0], each[1], {"dnn1":each[2]["dnn1"], "dnn2":each[2]["dnn2"]}))
+    result = nick_sort(result)
+    f_s_time = time.time() - f_s_start
+    
+    print (">>> query: %s, can_time:%.5f, score_time:%.5f, filter_sort_time: %.5f" % (query.encode("utf-8"), can_time, score_time, f_s_time))
+    for i, each in enumerate(result):
+        print(">>> retrieve(%d): %s%s%s" % (i, nick_format(each[0], 60), nick_format(each[1], 50), {"dnn1":each[2]["dnn1"], "dnn2":each[2]["dnn2"]}))
     print ""
 
     ret["result"] = result
@@ -111,6 +125,33 @@ def name():
     resp.headers['Access-Control-Allow-Origin'] = '*' 
     return resp
 
+# each candidate is of format below:
+# [title_str_utf8, content_str_utf8, {a web search info dict}, source_url, [a list of other scores], index_orig_candidates]  
+
+def nick_is_valid_post(post, debug_info):
+    def too_short(query):
+        return len(query) < 2 
+    
+    def is_dup_seq(query):
+        if len(query) < 2:
+            return True 
+        ret = True 
+        for i in range(1,len(query)):
+            if query[i] != query[i-1]:
+                ret = False
+                return ret
+        return ret
+    if too_short(post):
+        print ("post %s shorter than 3" % post.encode("utf-8"))
+        debug_info["Ignored"] = "post not valid: shorter than 3"
+        return False
+    elif is_dup_seq(post):
+        print ("post %s is dup chars" % post.encode("utf-8"))
+        debug_info["Ignored"] = "post not valid: composed of duplicated chars"
+        return False
+    else:
+        return True
+    
 def nick_sort(cans):
     #FixedRank, ContentRank, proxyR, bwpR, BextendR, KCRank 
     #TRank, Trans, LMRank

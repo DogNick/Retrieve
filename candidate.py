@@ -15,7 +15,7 @@ p_url = re.compile('<url><!\[CDATA\[(.*?)\]\]></url>')
 def search(query, magic):
     url = "http://10.134.96.66:5555" 
     #data = "parity=f1ddc0e4-57ef-4f1b-985f-b85e09c41afc&queryFrom=web&queryType=query&queryString=%s&start=0&end=100&forceQuery=1&magic=%s"%(urllib.quote_plus(query.decode('utf8').encode('gbk')), magic)
-    data = "parity=f1ddc0e4-57ef-4f1b-985f-b85e09c41afc&queryFrom=web&queryType=query&queryString=%s&start=0&end=20&forceQuery=1" % urllib.quote_plus(query.decode('utf8').encode('gbk'))
+    data = "parity=f1ddc0e4-57ef-4f1b-985f-b85e09c41afc&queryFrom=web&queryType=query&queryString=%s&start=0&end=20&forceQuery=1" % urllib.quote_plus(query.decode('utf8', "ignore").encode('gbk', "ignore"))
     response = requests.post(url, data=data)
     result_tag = p_tag.findall(response.text)
     result_title = p_title.findall(response.text)

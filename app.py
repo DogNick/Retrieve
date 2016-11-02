@@ -57,18 +57,18 @@ def name():
     ret["result"] = None 
     ret["debug_info"] = {} 
 
-        
-
     # search candidates
     query = request.args.get('query')
+    strategy = request.args.get('strategy')
+
     #if not nick_is_valid_post(query, ret["debug_info"]): 
     #    print ("post is not valid, return empty")
     #    ret["result"] = [] 
     #    resp = make_response(json.dumps(ret))
     #    resp.headers['Access-Control-Allow-Origin'] = '*' 
     #    return resp
-
     #magic = request.args.get('magic')
+
     magic = ""
     can_start = time.time()
     cans = candidate(query.encode('utf8'), magic)
@@ -86,17 +86,17 @@ def name():
     score_start = time.time()
     ##response = requests.post('http://127.0.0.1:5040/score', data=json.dumps(payload))
     score_time = time.time() - score_start
+
     ## if no response returned from score_server
     #if not response:
     #    ret["debug_info"]["error"] = "score_server no resposne" 
     #    resp = make_response(json.dumps(ret))
     #    resp.headers['Access-Control-Allow-Origin'] = '*' 
     #    return resp
-    #
     #scores = json.loads(response.text)
     scores = [[1] * 15] * len(cans) #fake
 
-    topN = 7 
+    topN = 20 
     cnt = 0
     # result select
     f_s_start = time.time()
@@ -107,12 +107,14 @@ def name():
         each = list(each)
         each.append(scores[i])
         each.append(i)
+        if not nick_is_valid_can(query.encode("utf-8"), each[0], ret["debug_info"]): 
+            continue
         result.append(each)
-        print result[-1]
         cnt = cnt + 1 
         if cnt == topN:
             break
-    result = nick_sort(result)
+
+    result = nick_sort(result, strategy)
     f_s_time = time.time() - f_s_start
     
     print (">>> query: %s, can_time:%.5f, score_time:%.5f, filter_sort_time: %.5f" % (query.encode("utf-8"), can_time, score_time, f_s_time))
@@ -126,7 +128,13 @@ def name():
     return resp
 
 # each candidate is of format below:
-# [title_str_utf8, content_str_utf8, {a web search info dict}, source_url, [a list of other scores], index_orig_candidates]  
+#[title_str_utf8, content_str_utf8, {a web search info dict}, source_url, [a list of other scores], index_orig_candidates]
+
+def nick_is_valid_can(query, can, debug_info):
+    if query.find(can) != -1 or can.find(query) != -1: 
+        return False 
+    else:
+        return True
 
 def nick_is_valid_post(post, debug_info):
     def too_short(query):
@@ -141,6 +149,7 @@ def nick_is_valid_post(post, debug_info):
                 ret = False
                 return ret
         return ret
+
     if too_short(post):
         print ("post %s shorter than 3" % post.encode("utf-8"))
         debug_info["Ignored"] = "post not valid: shorter than 3"
@@ -151,16 +160,22 @@ def nick_is_valid_post(post, debug_info):
         return False
     else:
         return True
-    
-def nick_sort(cans):
-    #FixedRank, ContentRank, proxyR, bwpR, BextendR, KCRank 
-    #TRank, Trans, LMRank
-    #dnn1, dnn2, dnn3, dnn4
-    #tlda, AnchorR, KBRank, BRank
-    #MatchRank, nKBRank, ExtraR, NExtraR, MissTerm, Loc, PageRank, UsrR, TimeRank, Rank, FinalRank
+
+   
+def nick_sort(cans, strategy):
+    # web search info
+    # FixedRank, ContentRank, proxyR, bwpR, BextendR, KCRank 
+    # TRank, Trans, LMRank
+    # dnn1, dnn2, dnn3, dnn4
+    # tlda, AnchorR, KBRank, BRank
+    # MatchRank, nKBRank, ExtraR, NExtraR, MissTerm, Loc, PageRank, UsrR, TimeRank, Rank, FinalRank
 
     # more rules here
     cans = sorted(cans, key=lambda x:(float(x[2]["dnn1"]), float(x[2]["dnn2"])), reverse=True)
+    if strategy == 'reverse':
+        for i, can in enumerate(cans):
+            cans[i][0], cans[i][1] = cans[i][1], cans[i][0]
+
     return cans
 
 if __name__ == '__main__':

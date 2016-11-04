@@ -104,6 +104,8 @@ def name():
     f_s_start = time.time()
     result = []
     deprecated = []
+
+    # construct result
     for i, each in enumerate(cans):
         if query_resp_same(query, each[1]):
             continue

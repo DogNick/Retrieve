@@ -9,6 +9,8 @@ from candidate import candidate
 from candidate import search
 from seg import seg_without_punc
 
+PUNC=u"[\uff0c\u3002\uff1f\uff01\uff03\u3001\uff1b\uff1a\u300c\u300d\u300e\u300f\u2018\u2019\u201c\u201d\uff08\uff09\u3014\u3015\u3010\u3011\u2026\uff0e\u300a\u300b]"
+
 def is_chinese(uchar):
     """判断一个unicode是否是汉字"""
     if uchar >= u'\u4e00' and uchar <= u'\u9fa5' or uchar >= u'\uff00' and uchar <= u'\uffef' or uchar >= u'\u3000' and uchar <= u'\u303f':
@@ -101,13 +103,15 @@ def name():
     # result select
     f_s_start = time.time()
     result = []
+    deprecated = []
     for i, each in enumerate(cans):
         if query_resp_same(query, each[1]):
             continue
         each = list(each)
         each.append(scores[i])
         each.append(i)
-        if not nick_is_valid_can(query.encode("utf-8"), each[0], ret["debug_info"]): 
+        if not nick_is_valid_can(query, each[0].decode("utf-8"), ret["debug_info"]): 
+            deprecated.append(each)
             continue
         result.append(each)
         cnt = cnt + 1 
@@ -117,9 +121,17 @@ def name():
     result = nick_sort(result, strategy)
     f_s_time = time.time() - f_s_start
     
-    print (">>> query: %s, can_time:%.5f, score_time:%.5f, filter_sort_time: %.5f" % (query.encode("utf-8"), can_time, score_time, f_s_time))
+    print (">>>")
+    print (">>>")
+    print (">>> Query: %s, " % query.encode("utf-8"))
+    print (">>> can_time:%.5f, score_time:%.5f, filter_sort_time: %.5f" % (can_time, score_time, f_s_time))
+    print (">>>>>>> Final <<<<<<<<<")
     for i, each in enumerate(result):
-        print(">>> retrieve(%d): %s%s%s" % (i, nick_format(each[0], 60), nick_format(each[1], 50), {"dnn1":each[2]["dnn1"], "dnn2":each[2]["dnn2"]}))
+        print(">>> retrieve(%s): %s%s%s" % (nick_format(str(each[-1]),2), nick_format(each[0], 60), nick_format(each[1], 50), {"dnn2":each[2]["dnn2"]}))
+    print ""
+    print (">>>>>>> Deprecated <<<<<<<<")
+    for i, each in enumerate(deprecated):
+        print(">>> retrieve(%s): %s%s%s" % (nick_format(str(each[-1]),2), nick_format(each[0], 60), nick_format(each[1], 50), {"dnn2":each[2]["dnn2"]}))
     print ""
 
     ret["result"] = result
@@ -131,7 +143,9 @@ def name():
 #[title_str_utf8, content_str_utf8, {a web search info dict}, source_url, [a list of other scores], index_orig_candidates]
 
 def nick_is_valid_can(query, can, debug_info):
-    if query.find(can) != -1 or can.find(query) != -1: 
+    cleared_query = re.sub(PUNC, "", query)
+    cleared_can = re.sub(PUNC, "", can)
+    if cleared_query.find(cleared_can) != -1 or cleared_can.find(cleared_query) != -1: 
         return False 
     else:
         return True
@@ -171,7 +185,8 @@ def nick_sort(cans, strategy):
     # MatchRank, nKBRank, ExtraR, NExtraR, MissTerm, Loc, PageRank, UsrR, TimeRank, Rank, FinalRank
 
     # more rules here
-    cans = sorted(cans, key=lambda x:(float(x[2]["dnn1"]), float(x[2]["dnn2"])), reverse=True)
+    #cans = sorted(cans, key=lambda x:(float(x[2]["dnn1"]), float(x[2]["dnn2"])), reverse=True)
+    cans = sorted(cans, key=lambda x:float(x[2]["dnn2"]), reverse=True)
     if strategy == 'reverse':
         for i, can in enumerate(cans):
             cans[i][0], cans[i][1] = cans[i][1], cans[i][0]

@@ -9,7 +9,7 @@ from candidate import candidate
 from candidate import search
 from seg import seg_without_punc
 
-PUNC=u"[\uff0c\u3002\uff1f\uff01\uff03\u3001\uff1b\uff1a\u300c\u300d\u300e\u300f\u2018\u2019\u201c\u201d\uff08\uff09\u3014\u3015\u3010\u3011\u2026\uff0e\u300a\u300b]"
+PUNC=u"[:,\"\uff0c\u3002\uff1f\uff01\uff03\u3001\uff1b\uff1a\u300c\u300d\u300e\u300f\u2018\u2019\u201c\u201d\uff08\uff09\u3014\u3015\u3010\u3011\u2026\uff0e\u300a\u300b]"
 
 def is_chinese(uchar):
     """判断一个unicode是否是汉字"""
@@ -144,13 +144,43 @@ def name():
 # each candidate is of format below:
 #[title_str_utf8, content_str_utf8, {a web search info dict}, source_url, [a list of other scores], index_orig_candidates]
 
+def lcs(s1, s2):   
+    m = [[0 for i in range(len(s2)+1)]  for j in range(len(s1)+1)]
+    mmax = p = p2 = 0
+    for i in range(len(s1)):  
+        for j in range(len(s2)):  
+            if s1[i] == s2[j]:  
+                m[i + 1][j + 1]=m[i][j] + 1  
+                if m[i + 1][j + 1] > mmax:  
+                    mmax = m[i + 1][j + 1]  
+                    p = i + 1  
+                    p2 = j + 1
+    return s1[p - mmax:p],p - mmax,p2 - mmax
+
+def dedup(s):
+    if s == "" or s == None:
+        return ""
+    ret = [s[0]]
+    j = 1 
+    while j < len(s):
+        if s[j] != ret[-1]:
+            ret.append(s[j])
+        j = j + 1     
+    return "".join(ret) 
+
 def nick_is_valid_can(query, can, debug_info):
-    cleared_query = re.sub(PUNC, "", query)
-    cleared_can = re.sub(PUNC, "", can)
-    if cleared_query.find(cleared_can) != -1 or cleared_can.find(cleared_query) != -1: 
+    query_tmp = dedup(re.sub(PUNC, "", query))
+    can_tmp = dedup(re.sub(PUNC, "", can))
+    com_str, p1, p2 = lcs(query_tmp, can_tmp) 
+    if len(com_str) == len(query_tmp) or len(com_str) == len(can_tmp):
+        print "Deprecated: substring, query: %s, can: %s" % (query_tmp.encode("utf-8"), can_tmp.encode("utf-8"))
         return False 
-    else:
-        return True
+    if len(can_tmp) >= 5:
+        lc, lq, lr = len(com_str) * 1.0, len(query_tmp) * 1.0, len(can_tmp) * 1.0
+        if lc / lq > 0.5 and lc / lr > 0.5:
+            return False
+    return True
+    
 
 def nick_is_valid_post(post, debug_info):
     def too_short(query):

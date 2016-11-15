@@ -10,8 +10,8 @@ workers = multiprocessing.cpu_count() * 2 + 1
 worker_class = 'gunicorn.workers.ggevent.GeventWorker'
 
 loglevel = 'info'
-logfile = '/search/odin/offline/retrieve_ranker/logs/unicorn_debug.log'
-pidfile = '/search/odin/offline/retrieve_ranker/logs/unicorn.pid'
+logfile = '/search/odin/offline/retrieve-ranker/logs/unicorn_debug.log'
+pidfile = '/search/odin/offline/retrieve-ranker/logs/unicorn.pid'
 errorlog = '-'
 
 x_forwarded_for_header = 'X-FORWARDED-FOR'

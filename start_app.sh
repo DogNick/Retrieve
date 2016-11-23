@@ -1,6 +1,6 @@
 #!/bin/bash
-sh stop.sh
-nohup uwsgi --thunder-lock config/uwsgiconfig.ini &
+#sh stop.sh
+nohup uwsgi config/uwsgiconfig.ini &
 #tail -f logs/retrieve-ranker.std.log
 
 #supervisord -c config/retrieve_supervisor.conf

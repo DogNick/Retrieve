@@ -112,7 +112,8 @@ def name():
         each = list(each)
         each.append(scores[i])
         each.append(i)
-        if not nick_is_valid_can(query, each[0].decode("utf-8"), ret["debug_info"]): 
+        resp = each[0].decode("utf-8") if strategy == "reverse" else each[1].decode("utf-8")
+        if not nick_is_valid_can(query, resp, ret["debug_info"]): 
             deprecated.append(each)
             continue
         result.append(each)
@@ -170,6 +171,7 @@ def dedup(s):
 
 def nick_is_valid_can(query, can, debug_info):
     query_tmp = dedup(re.sub(PUNC, "", query))
+     
     can_tmp = dedup(re.sub(PUNC, "", can))
     com_str, p1, p2 = lcs(query_tmp, can_tmp) 
     if len(com_str) == len(query_tmp) or len(com_str) == len(can_tmp):

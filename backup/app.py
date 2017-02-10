@@ -11,6 +11,10 @@ from seg import seg_without_punc
 
 PUNC=u"[:,\"\uff0c\u3002\uff1f\uff01\uff03\u3001\uff1b\uff1a\u300c\u300d\u300e\u300f\u2018\u2019\u201c\u201d\uff08\uff09\u3014\u3015\u3010\u3011\u2026\uff0e\u300a\u300b]"
 
+define('port',default=1024,help='run on the port',type=int)
+define('procnum',default=2,help='process num',type=int)
+
+
 def is_chinese(uchar):
 	"""判断一个unicode是否是汉字"""
 	if uchar >= u'\u4e00' and uchar <= u'\u9fa5' or uchar >= u'\uff00' and uchar <= u'\uffef' or uchar >= u'\u3000' and uchar <= u'\u303f':
@@ -27,8 +31,6 @@ def nick_format(text, width):
 	#		print u.encode("utf-8")
 			cn_count = cn_count + 1 
 	return stext + " " * (width - cn_count - len(utext))
-
-
 
 def query_resp_same(query, resp):
 	final_result = []
@@ -133,6 +135,7 @@ def name():
 		cnt = cnt + 1 
 		if cnt == topN:
 			break
+
 	result = nick_sort(result, strategy)
 	f_s_time = time.time() - f_s_start
 	

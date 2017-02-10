@@ -47,7 +47,7 @@ class FutureHandler(tornado.web.RequestHandler):
 			return
 		logging.info('[retrieve_server] [REQUEST] [%s] [%s] [%s]' % (time.strftime('%Y-%m-%d %H:%M:%S'), self.query, self.strategy))
 
-		cans, t = yield self.candidate(50) 
+		cans, t = yield self.elastic_candidate(50) 
 		ret["debug_info"]["elastic_time"] = t 
 		if len(cans) == 0:
 			ret["debug_info"]["err"] = "no candidates" 
@@ -72,7 +72,7 @@ class FutureHandler(tornado.web.RequestHandler):
 		self.finish()
 
 	@tornado.gen.coroutine
-	def candidate(self, size):
+	def elastic_candidate(self, size):
 		q = urllib.quote(self.query.encode("utf-8"))
 		elastic_host = "http://10.152.72.238:9200"
 		url = "%s/retrieve/postcomment/_search?pretty&q=%s&size=%d" % (elastic_host ,q, size)

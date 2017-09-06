@@ -117,8 +117,15 @@ class FutureHandler(tornado.web.RequestHandler):
 
 	@tornado.gen.coroutine
 	def elastic_candidate(self, size):
-		q = {"query":{"match":{"_all":self.query}}}
-		url = "%s/retrieve/postcomment/_search?pretty&size=%d" % (self.elastic_host, size)
+		q = {
+				"query":
+				{
+					"match":{"query":self.query}
+				},
+				"size":size
+			}
+		#url = "%s/retrieve/postcomment/_search?pretty&size=%d" % (self.elastic_host, size)
+		url = "%s/chaten/_search" % self.elastic_host
 		req = tornado.httpclient.HTTPRequest(url, method="POST", headers=None, body=json.dumps(q, ensure_ascii=False))
 		http_client = tornado.httpclient.AsyncHTTPClient(force_instance=True,
 														defaults=dict(request_timeout=self.timeout,connect_timeout=self.timeout))
@@ -127,8 +134,8 @@ class FutureHandler(tornado.web.RequestHandler):
 		cans = []
 		for i, each in enumerate(res_js["hits"]["hits"]):
 			info = {"elastic_score":each["_score"], "elastic_idx":i}
-			post, resp = each["_source"]["post"], each["_source"]["comment"] 
-			cans.append((each["_source"]["post"], each["_source"]["comment"], info, url))
+			post, resp = each["_source"]["query"], each["_source"]["response"] 
+			cans.append((each["_source"]["query"], each["_source"]["response"], info, url))
 		raise gen.Return((cans, res_js["took"]))
 
 	@tornado.gen.coroutine
@@ -210,7 +217,8 @@ class FutureHandler(tornado.web.RequestHandler):
 	@tornado.gen.coroutine
 	def sort(self, cans): 
 		# maybe random_walk 
-		cans = sorted(cans, key=lambda x: float(x[2]["deepmatch_score"]), reverse=True)
+		#cans = sorted(cans, key=lambda x: float(x[2]["deepmatch_score"]), reverse=True)
+		cans = sorted(cans, key=lambda x: float(x[2]["elastic_score"]), reverse=True)
 		raise gen.Return(cans)
 
 	def select(self, cans, deprecated):

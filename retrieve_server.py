@@ -21,10 +21,11 @@ define('port',default=5555,help='run on the port',type=int)
 define('procnum',default=2,help='process num',type=int)
 
 define('index_type',default="searchhub",help='searchhub or elastic', type=bytes)
-define('index_size',default=25, help='', type=int)
 
 define('searchhub_host',default="http://10.134.34.41:5335", help='searchhub url',type=bytes)
 define('elastic_host',default="http://10.152.72.238:9200", help='elastic search url',type=bytes)
+define('index_name',default="chaten", help='elastic index name',type=bytes)
+define('data_type',default="", help='elastic _type key',type=bytes)
 define('score_host',default="", help='score server url, default not used',type=bytes)
 
 
@@ -44,15 +45,13 @@ from seg import seg_without_punc
 PUNC=u"[:,\"\uff0c\u3002\uff1f\uff01\uff03\u3001\uff1b\uff1a\u300c\u300d\u300e\u300f\u2018\u2019\u201c\u201d\uff08\uff09\u3014\u3015\u3010\u3011\u2026\uff0e\u300a\u300b]"
 
 class FutureHandler(tornado.web.RequestHandler):
-	def initialize(self, index_type, index_size, searchhub_host, elastic_host, score_host):
+	def initialize(self, index_type, searchhub_host, elastic_host, index_name, data_type, score_host):
 		self.index_type = index_type
-		self.index_size = index_size
 		self.searchhub_host = searchhub_host
 		self.elastic_host = elastic_host
+		self.index_name = index_name
+		self.data_type = data_type
 		self.score_host = score_host
-		if self.index_size <= 0:
-			logging.error('[retrieve_server] [ERROR: index_size must be greater than 0] [REQUEST] [%s]' % (time.strftime('%Y-%m-%d %H:%M:%S')))
-			exit(0)
 		if self.index_type not in ["searchhub", "elastic"]:
 			logging.error('[retrieve_server] [ERROR: index_type mast be "elastic" or "searchhub"] [REQUEST] [%s]' % (time.strftime('%Y-%m-%d %H:%M:%S')))
 			exit(0)
@@ -66,6 +65,8 @@ class FutureHandler(tornado.web.RequestHandler):
 
 		self.query = self.get_query_argument('query', None)
 		self.strategy = self.get_query_argument('strategy', "normal")
+		self._r = float(self.get_query_argument('r', 0.5))
+		self._n = int(self.get_query_argument('n', 20))
 		self.timeout = 4.0
 		if not self.query:
 			ret["debug_info"]["err"] = "missing params"
@@ -79,10 +80,10 @@ class FutureHandler(tornado.web.RequestHandler):
 
 		if self.index_type == "searchhub": 
 			# Use sogou search hub
-			cans, t = yield self.searchhub_candidate(self.index_size) 
+			cans, t = yield self.searchhub_candidate(self._n) 
 			ret["debug_info"]["elastic_time"] = t 
 		elif self.index_type == "elastic":
-			cans, t = yield self.elastic_candidate(self.index_size) 
+			cans, t = yield self.elastic_candidate(self._n) 
 			ret["debug_info"]["search_time"] = t 
 		else:
 			logging.error('[retrieve_server] [ERROR: Unknown index type %s] [REQUEST] [%s]' % (self.index_type, time.strftime('%Y-%m-%d %H:%M:%S')))
@@ -120,12 +121,17 @@ class FutureHandler(tornado.web.RequestHandler):
 		q = {
 				"query":
 				{
-					"match":{"query":self.query}
+					"match":{"query":self.query},
 				},
-				"size":size
+				"size":size,
+				
 			}
 		#url = "%s/retrieve/postcomment/_search?pretty&size=%d" % (self.elastic_host, size)
-		url = "%s/chaten/_search" % self.elastic_host
+		if self.data_type:
+			url = "%s/%s/_search?type=%s" % (self.elastic_host, self.index_name, self.data_type)
+		else:
+			url = "%s/%s/_search" % (self.elastic_host, self.index_name)
+			
 		req = tornado.httpclient.HTTPRequest(url, method="POST", headers=None, body=json.dumps(q, ensure_ascii=False))
 		http_client = tornado.httpclient.AsyncHTTPClient(force_instance=True,
 														defaults=dict(request_timeout=self.timeout,connect_timeout=self.timeout))
@@ -133,7 +139,7 @@ class FutureHandler(tornado.web.RequestHandler):
 		res_js = json.loads(res.body)
 		cans = []
 		for i, each in enumerate(res_js["hits"]["hits"]):
-			info = {"elastic_score":each["_score"], "elastic_idx":i}
+			info = {"elastic_score":each["_score"], "elastic_idx":i, "context_en":each["_source"].get("content_en", []), "context_ch":each["_source"].get("content_ch", [])}
 			post, resp = each["_source"]["query"], each["_source"]["response"] 
 			cans.append((each["_source"]["query"], each["_source"]["response"], info, url))
 		raise gen.Return((cans, res_js["took"]))
@@ -196,29 +202,31 @@ class FutureHandler(tornado.web.RequestHandler):
 			data = {
 				"model_name":"stc-2-interact",
 				"query": self.query.encode("utf-8"),
-				"cans":json.dumps([[each[0], each[1]] for each in cans])
+				"cans":[each[0] for each in cans],
+				"responses":[each[1] for each in cans]
 			}
-			deepmatch_host = "http://10.141.104.69:9000"
-			url = "%s/deepmatch?" % deepmatch_host
-			#json.dumps(data, ensure_ascii=False)
-			body = urllib.urlencode(data)
+			url = "%s/scorer" % self.score_host
+			body = json.dumps(data)
+			#body = urllib.urlencode(data)
 			#body = urllib.quote(json.dumps(data).encode("utf-8"))
 			req = tornado.httpclient.HTTPRequest(url, method="POST", headers=None, body=body)
 			http_client = tornado.httpclient.AsyncHTTPClient(force_instance=True,
 															defaults=dict(request_timeout=self.timeout,connect_timeout=self.timeout))
 			res = yield http_client.fetch(req)
 			res_js = json.loads(res.body)
-			scores = res_js["result"][0]["scores"]
+			scores = res_js["result"]
 
 		for i in range(len(cans)):
-			cans[i][2]["deepmatch_score"] = str(scores[i])
+			info = cans[i][2]
+			for k, v in scores[i].items():
+				info[k] = v
+			info["score"] = (info["elastic_score"] + info.get("rnn_enc", 0) + info.get("sum_emb", 0)) * self._r + (1 - self._r)*info.get("posteriors", 0.0)
 		raise gen.Return(cans[0:10])
 
 	@tornado.gen.coroutine
 	def sort(self, cans): 
 		# maybe random_walk 
-		#cans = sorted(cans, key=lambda x: float(x[2]["deepmatch_score"]), reverse=True)
-		cans = sorted(cans, key=lambda x: float(x[2]["elastic_score"]), reverse=True)
+		cans = sorted(cans, key=lambda x: float(x[2]["score"]), reverse=True)
 		raise gen.Return(cans)
 
 	def select(self, cans, deprecated):
@@ -238,7 +246,7 @@ class FutureHandler(tornado.web.RequestHandler):
 			selected.append(each)
 
 		# N shortest resp
-		N = 5 
+		N = 10 
 		heap = []	
 
 		heapq.nsmallest(N, cans, key=lambda x:len(x[1]))
@@ -348,9 +356,10 @@ def nick_is_valid_can(query, can):
 def main():
 	parse_command_line()
 	args = dict(index_type=options.index_type,
-				index_size=options.index_size,
 				searchhub_host=options.searchhub_host,
 				elastic_host=options.elastic_host,
+				index_name=options.index_name,
+				data_type=options.data_type,
 				score_host=options.score_host)
 	app=tornado.web.Application(
 		[

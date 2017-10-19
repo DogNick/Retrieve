@@ -183,7 +183,9 @@ To start(stop) it:
     # seelog
     tail -f logs/retrieve_server.log
 ```
+
 U can also change the behavior of the Retrieve server by setting different params in `start.sh` while starting
+
 | Params| usage |
 | ------ | ------ |
 | index_type | Indexing system name, u may use others (e.g. searchhub -- used many thousands of years ago, refer to searchhub_candidates(), currently we use 'elastic' |

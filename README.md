@@ -97,7 +97,19 @@ Data resources (up to now):
     # Original Broke sisters .ass files and python scripts for processing it into json
     /search/odin/Nick/GenerateWorkshop/data/broke_sisters/
     # season 1 - 6, maybe hundreds of thousands, not sure
-    #... waiting for 2 interns' docs
+	# scripts to process:
+    /search/odin/Nick/GenerateWorkshop/data/ass_to_sess.py
+    /search/odin/Nick/GenerateWorkshop/data/chaten_brokesisters_3.py
+    
+    # transfer ass to srt
+    cat python ass_to_sess.py > out.1 
+    
+    # 将`1.out`转换为`brokesisters3.json`文件
+    # 每条记录由最多连续六条构成（间隔时间不超过给定参数 `interval`）
+    # 集数(_episode_)与季数(_season_)判断:
+    #    遇到_index_为1自动将_episode_ + 1
+    #    每季的集数硬编码在代码当中(`ep` list)
+    python chaten_brokensisters_3.py # --interval=200
     
     # Original opensubtitles data constructed by question-ans criteria
     # 1.1kw+, lower case, reponses are greater than 3

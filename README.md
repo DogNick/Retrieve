@@ -95,11 +95,11 @@ Data resources (up to now):
     root@10.141.176.103, password: sogourank@2016
     
     # Original Broke sisters .ass files and python scripts for processing it into json
-    /search/odin/Nick/GenerateWorkshop/data/broke_sisters/
+    /search/odin/Nick/GenerateWorkshop/data/BrokeSisters/broke_sisters/
     # season 1 - 6, maybe hundreds of thousands, not sure
 	# scripts to process:
-    /search/odin/Nick/GenerateWorkshop/data/ass_to_sess.py
-    /search/odin/Nick/GenerateWorkshop/data/chaten_brokesisters_3.py
+    /search/odin/Nick/GenerateWorkshop/data/BrokeSisters/ass_to_sess.py
+    /search/odin/Nick/GenerateWorkshop/data/BrokeSisters/chaten_brokesisters_3.py
     
     # transfer ass to srt
     cat python ass_to_sess.py > out.1 

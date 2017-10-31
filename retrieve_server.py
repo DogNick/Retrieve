@@ -141,7 +141,8 @@ class FutureHandler(tornado.web.RequestHandler):
 		for i, each in enumerate(res_js["hits"]["hits"]):
 			info = {"elastic_score":each["_score"], "elastic_idx":i, "context_en":each["_source"].get("content_en", []), "context_ch":each["_source"].get("content_ch", [])}
 			post, resp = each["_source"]["query"], each["_source"]["response"] 
-			cans.append((each["_source"]["query"], each["_source"]["response"], info, url))
+			can_url = "%s/%s/%s/%s" % (self.elastic_host, self.index_name, self.data_type, each["_id"])
+			cans.append((each["_source"]["query"], each["_source"]["response"], info, can_url))
 		raise gen.Return((cans, res_js["took"]))
 
 	@tornado.gen.coroutine
@@ -355,6 +356,11 @@ def nick_is_valid_can(query, can):
 
 def main():
 	parse_command_line()
+
+
+	# create models ,and init
+	# get model handler
+	# 
 	args = dict(index_type=options.index_type,
 				searchhub_host=options.searchhub_host,
 				elastic_host=options.elastic_host,
